@@ -5,23 +5,37 @@ import io
 from PIL import Image
 import torch
 import torch.nn as nn
-import torchvision.transforms as transforms
-from flask import Flask, request, jsonify
+from torchvision import models, transforms
+
+# -------------------------------------------------
+# App Configuration
+# -------------------------------------------------
 
 app = Flask(__name__)
 
-# SQLite local file database config
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///users.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
+
+# -------------------------------------------------
+# Device Configuration
+# -------------------------------------------------
+
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+# -------------------------------------------------
+# Database Model
+# -------------------------------------------------
 
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
     password_hash = db.Column(db.String(128), nullable=False)
 
-# Remove the @app.before_first_request decorator and function
+# -------------------------------------------------
+# Authentication Routes
+# -------------------------------------------------
 
 @app.route('/register', methods=['POST'])
 def register():
@@ -43,6 +57,7 @@ def register():
 
     return jsonify({'message': 'User registered successfully'}), 200
 
+
 @app.route('/login', methods=['POST'])
 def login():
     data = request.get_json()
@@ -60,12 +75,13 @@ def login():
         return jsonify({'message': 'Invalid username or password'}), 401
 
 
+# -------------------------------------------------
+# DenseNet201 Model (Same as Training)
+# -------------------------------------------------
 
-# Your DenseNet201Model class exactly as in training
 class DenseNet201Model(nn.Module):
     def __init__(self, num_classes):
         super(DenseNet201Model, self).__init__()
-        from torchvision import models
         self.densenet = models.densenet201(pretrained=False)
         self.densenet.classifier = nn.Sequential(
             nn.Linear(1920, 512),
@@ -77,22 +93,25 @@ class DenseNet201Model(nn.Module):
     def forward(self, x):
         return self.densenet(x)
 
+# -------------------------------------------------
+# Image Preprocessing (Same as Training)
+# -------------------------------------------------
 
-from torchvision import transforms
-
-# Define transform to preprocess input images (same as training)
 transform = transforms.Compose([
     transforms.Resize((224, 224)),
     transforms.ToTensor(),
-    transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                         std=[0.229, 0.224, 0.225]),
+    transforms.Normalize(
+        mean=[0.485, 0.456, 0.406],
+        std=[0.229, 0.224, 0.225]
+    ),
 ])
 
+# -------------------------------------------------
+# Model Loading
+# -------------------------------------------------
 
-# Number of classes
 num_classes = 8
 
-# Your class names in the same order as training dataset classes
 class_names = {
     0: 'dyed-lifted-polyps',
     1: 'dyed-resection-margins',
@@ -104,10 +123,14 @@ class_names = {
     7: 'ulcerative-colitis',
 }
 
-# Instantiate your model with correct number of classes
 model = DenseNet201Model(num_classes=num_classes)
-model.load_state_dict(torch.load('Stomachcancer.pth', map_location=torch.device('cpu')))
+model.load_state_dict(torch.load('models/Stomachcancer.pth', map_location=device))
+model.to(device)
 model.eval()
+
+# -------------------------------------------------
+# Prediction Route
+# -------------------------------------------------
 
 @app.route('/predict', methods=['POST'])
 def predict():
@@ -118,7 +141,7 @@ def predict():
     img_bytes = file.read()
     image = Image.open(io.BytesIO(img_bytes)).convert('RGB')
 
-    input_tensor = transform(image).unsqueeze(0)  # Add batch dim
+    input_tensor = transform(image).unsqueeze(0).to(device)
 
     with torch.no_grad():
         outputs = model(input_tensor)
@@ -129,9 +152,11 @@ def predict():
 
     return jsonify({'disease_name': predicted_class})
 
+# -------------------------------------------------
+# Run Application
+# -------------------------------------------------
 
 if __name__ == '__main__':
-    # Create tables explicitly before running app
     with app.app_context():
         db.create_all()
     app.run(host='0.0.0.0', port=5000)
