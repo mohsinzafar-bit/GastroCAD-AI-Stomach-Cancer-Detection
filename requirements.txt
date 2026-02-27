@@ -1,6 +1,6 @@
-flask
-flask_sqlalchemy
 torch
 torchvision
+flask
+flask_sqlalchemy
 pillow
 werkzeug
