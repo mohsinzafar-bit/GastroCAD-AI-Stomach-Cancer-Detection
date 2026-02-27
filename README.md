@@ -1,10 +1,31 @@
-# GastroCAD: AI-Based Stomach Cancer Detection
+# GastroCAD - AI Based Stomach Cancer Detection
 
-This project implements a PyTorch-based deep learning model
-for stomach cancer classification using endoscopic images.
+## Overview
+GastroCAD is a Flask-based AI system for gastrointestinal disease classification using DenseNet201.
 
-Model Architecture: DenseNet201
-Framework: PyTorch
-Deployment: Flask API
+## Features
+- User Registration & Login (SQLite)
+- DenseNet201 Deep Learning Model
+- REST API for Prediction
+- GPU/CPU Compatible Deployment
 
-Author: Mohsin Zafar
+## Model Details
+- Architecture: DenseNet201
+- Classes: 8 GI disease categories
+- Loss: CrossEntropyLoss
+- Optimizer: Adam
+- Regularization: Dropout(0.5)
+
+## Run Locally
+
+pip install -r requirements.txt
+python app.py
+
+## API Endpoints
+
+POST /register  
+POST /login  
+POST /predict (form-data key: image)
+
+## Model File
+models/Stomachcancer.pth
